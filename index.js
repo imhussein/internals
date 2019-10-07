@@ -49,6 +49,8 @@ while (shouldContiue()) {
 const crypto = require("crypto");
 const fs = require("fs");
 const http = require("http");
+const EventEmitter = require("events");
+const util = require("util");
 // Thread Pool By Default in NodeJS is a series of four threads and i can be configured and increased in env object
 process.env.UV_THREADPOOL_SIZE = 5;
 
@@ -58,7 +60,11 @@ crypto.pbkdf2("String A", "String B", 100000, 512, "sha512", () => {
 });
 
 // Reading Files By LibUV First make a request to get info about the file location and size then LibUV put it in the queue
-fs.readFile(__dirname + "/cookies.js", "utf8", () => {
+const readable = fs.createReadStream(__dirname + "/cookies.js", {
+  encoding: "utf8"
+});
+
+readable.on("data", function(data) {
   console.log("6 - File  =====> ", Date.now() - date);
 });
 
@@ -73,12 +79,28 @@ function doRequest() {
 
 // NodeJS and LibUV has no code to handle http requests
 // Http Requests is Delgated By LibUV To Underinline Operating System and LibUV waits for completion notice to run inside LibUV Single Thread
-doRequest();
-doRequest();
-doRequest();
-doRequest();
-doRequest();
-doRequest();
+const requests = [
+  doRequest,
+  doRequest,
+  doRequest,
+  doRequest,
+  doRequest,
+  doRequest
+];
+
+function DORequests() {}
+
+util.inherits(DORequests, EventEmitter);
+
+const doReqs = new DORequests();
+
+doReqs.on("makeRequests", function(data) {
+  for (let item of data) {
+    item();
+  }
+});
+
+doReqs.emit("makeRequests", requests);
 
 crypto.pbkdf2("String A", "String B", 100000, 512, "sha512", () => {
   console.log("2 - Two   =====> ", Date.now() - date);
@@ -95,3 +117,37 @@ crypto.pbkdf2("String A", "String B", 100000, 512, "sha512", () => {
 crypto.pbkdf2("String A", "String B", 100000, 512, "sha512", () => {
   console.log("5 - Five  =====> ", Date.now() - date);
 });
+
+/* ================================================================================= */
+
+// Two Wayes To Improve Performance In NodeJS
+// 1 - Strting NodeJS in Cluster Mode/Slave Mode/Child Mode and faking multithreads
+// 2 - Use Worker Threads
+const express = require("express");
+const cluster = require("cluster"); // Cluster Manager is used to manage multiple instances of node js started as a child proceses of nodejs
+const app = express();
+
+function doWork() {
+  const start = Date.now();
+  while (Date.now() - start < 5000) {}
+}
+
+console.log(cluster.isMaster); // Cluster.isMaster is alwayes in parent instance
+
+// cluster.isMater by default is set TRUE untill cluster.fork() is called
+if (cluster.isMaster) {
+  // When Fork is called - NodeJS Go Back And Execute File in slave Mode or child Mode
+  cluster.fork();
+  cluster.fork();
+} else {
+  // Child Mode That Act As Seperate Instance
+  app.get("/", function(req, res) {
+    doWork();
+    res.send("Express");
+  });
+
+  const port = process.env.PORT || 3000;
+  app.listen(port, () => {
+    console.log(`Server started at port ${port}`);
+  });
+}
