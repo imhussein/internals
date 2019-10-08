@@ -52,7 +52,7 @@ const http = require("http");
 const EventEmitter = require("events");
 const util = require("util");
 // Thread Pool By Default in NodeJS is a series of four threads and i can be configured and increased in env object
-process.env.UV_THREADPOOL_SIZE = 5;
+process.env.UV_THREADPOOL_SIZE = 1;
 
 const date = Date.now();
 crypto.pbkdf2("String A", "String B", 100000, 512, "sha512", () => {
@@ -142,7 +142,9 @@ if (cluster.isMaster) {
 } else {
   // Child Mode That Act As Seperate Instance
   app.get("/", function(req, res) {
-    doWork();
+    crypto.pbkdf2("String A", "String B", 100000, 512, "sha512", () => {
+      console.log("5 - Five  =====> ", Date.now() - date);
+    });
     res.send("Express");
   });
 
